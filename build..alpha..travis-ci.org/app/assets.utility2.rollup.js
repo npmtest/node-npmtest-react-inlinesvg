@@ -303,24 +303,6 @@
                 return String(value);
             });
         };
-
-        local.tryCatchOnError = function (fnc, onError) {
-        /*
-         * this function will try to run the fnc in a try-catch block,
-         * else call onError with the errorCaught
-         */
-            // validate onError
-            local.assert(typeof onError === 'function', typeof onError);
-            try {
-                // reset errorCaught
-                local._debugTryCatchErrorCaught = null;
-                return fnc();
-            } catch (errorCaught) {
-                // debug errorCaught
-                local._debugTryCatchErrorCaught = errorCaught;
-                return onError(errorCaught);
-            }
-        };
     }());
 
 
@@ -508,25 +490,23 @@ local.templateApidocHtml = '\
             /*
              * this function will read the example from the given file
              */
-                var result;
-                local.tryCatchOnError(function () {
-                    result = '';
-                    result = ('\n\n\n\n\n\n\n\n' +
+                try {
+                    return ('\n\n\n\n\n\n\n\n' +
                         local.fs.readFileSync(local.path.resolve(options.dir, file), 'utf8') +
                         '\n\n\n\n\n\n\n\n').replace((/\r\n*/g), '\n');
-                }, console.error);
-                return result;
+                } catch (errorCaught) {
+                    return '';
+                }
             };
             toString = function (value) {
             /*
              * this function will try to return the string form of the value
              */
-                var result;
-                local.tryCatchOnError(function () {
-                    result = '';
-                    result = String(value);
-                }, console.error);
-                return result;
+                try {
+                    return String(value);
+                } catch (errorCaught) {
+                    return '';
+                }
             };
             trimLeft = function (text) {
             /*
@@ -555,9 +535,11 @@ local.templateApidocHtml = '\
                 env: { npm_package_description: '' },
                 packageJson: JSON.parse(readExample('package.json')),
                 require: function (file) {
-                    return local.tryCatchOnError(function () {
+                    try {
                         return require(file);
-                    }, console.error);
+                    } catch (errorCaught) {
+                        console.error(errorCaught);
+                    }
                 }
             });
             Object.keys(options.packageJson).forEach(function (key) {
@@ -609,7 +591,7 @@ local.templateApidocHtml = '\
                 })
                 .slice(0, 128);
             // init moduleMain
-            local.tryCatchOnError(function () {
+            try {
                 console.error('apidocCreate - requiring ' + options.dir + ' ...');
                 moduleMain = {};
                 moduleMain = options.moduleDict[options.env.npm_package_name] ||
@@ -618,7 +600,8 @@ local.templateApidocHtml = '\
                         Object.keys(options.packageJson.bin)[0]
                     ]) || {};
                 console.error('apidocCreate - ... required ' + options.dir);
-            }, console.error);
+            } catch (ignore) {
+            }
             tmp = {};
             // handle case where module is a function
             if (typeof moduleMain === 'function') {
@@ -690,7 +673,7 @@ local.templateApidocHtml = '\
                 );
             });
             options.libFileList.some(function (file) {
-                local.tryCatchOnError(function () {
+                try {
                     tmp = {};
                     tmp.name = local.path.basename(file)
                         .replace('lib.', '')
@@ -733,7 +716,9 @@ local.templateApidocHtml = '\
                     options.exampleList.push(readExample(file));
                     console.error('apidocCreate - ' + options.exampleList.length +
                         '. added libFile ' + file);
-                }, console.error);
+                } catch (errorCaught) {
+                    console.error(errorCaught);
+                }
                 return options.exampleList.length >= 256;
             });
             local.apidocModuleDictAdd(options, options.moduleExtraDict);
@@ -751,20 +736,22 @@ local.templateApidocHtml = '\
                     module = options.moduleDict[prefix];
                     // handle case where module is a function
                     if (typeof module === 'function') {
-                        local.tryCatchOnError(function () {
+                        try {
                             module[prefix.split('.').slice(-1)[0]] =
                                 module[prefix.split('.').slice(-1)[0]] || module;
-                        }, console.error);
+                        } catch (ignore) {
+                        }
                     }
                     return {
                         elementList: Object.keys(module)
                             .filter(function (key) {
-                                return local.tryCatchOnError(function () {
+                                try {
                                     return key &&
                                         (/^\w[\w\-.]*?$/).test(key) &&
                                         key.indexOf('testCase_') !== 0 &&
                                         module[key] !== options.blacklistDict[key];
-                                }, console.error);
+                                } catch (ignore) {
+                                }
                             })
                             .map(function (key) {
                                 return elementCreate(module, prefix, key);
@@ -797,7 +784,7 @@ local.templateApidocHtml = '\
                     }
                     Object.keys(moduleDict[prefix]).forEach(function (key) {
                         // bug-workaround - buggy electron getter / setter
-                        local.tryCatchOnError(function () {
+                        try {
                             if (!(/^\w[\w\-.]*?$/).test(key) || !moduleDict[prefix][key]) {
                                 return;
                             }
@@ -823,9 +810,10 @@ local.templateApidocHtml = '\
                             ].some(function (dict) {
                                 return Object.keys(dict || {}).some(function (key) {
                                     // bug-workaround - buggy electron getter / setter
-                                    return local.tryCatchOnError(function () {
+                                    try {
                                         return typeof dict[key] === 'function';
-                                    }, console.error);
+                                    } catch (ignore) {
+                                    }
                                 });
                             });
                             if (!isModule) {
@@ -833,7 +821,8 @@ local.templateApidocHtml = '\
                             }
                             options.circularList.push(tmp.module);
                             options.moduleDict[tmp.name] = tmp.module;
-                        }, console.error);
+                        } catch (ignore) {
+                        }
                     });
                 });
             });
